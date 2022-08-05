@@ -1,0 +1,59 @@
+def downloadJson() {
+    def now = new Date()
+    def file_date = now.format('dd-MM-yyyy', TimeZone.getTimeZone('UTC'))
+    cleanWs()
+    bat """
+       cd %WORKSPACE%
+       curl -u "${ARTFY_USER}:${ARTFY_APIKEY}" -O https://artifactory.corp.adobe.com/artifactory/generic-acpl-release-local/cicdanalytics/${file_date}/jobMetrics.zip  || cd .
+       curl -u "${ARTFY_USER}:${ARTFY_APIKEY}" -O https://artifactory.corp.adobe.com/artifactory/generic-acpl-release-local/cicdanalytics/${file_date}/prMetrics.zip  || cd .
+       curl -u "${ARTFY_USER}:${ARTFY_APIKEY}" -O https://artifactory.corp.adobe.com/artifactory/generic-acpl-release-local/cicdanalytics/${file_date}/machineMetrics.zip  || cd .
+       curl -u "${ARTFY_USER}:${ARTFY_APIKEY}" -O https://artifactory.corp.adobe.com/artifactory/generic-acpl-release-local/cicdanalytics/${file_date}/accountsInfo_acpl-dev.json  || cd .
+       curl -u "${ARTFY_USER}:${ARTFY_APIKEY}" -O https://artifactory.corp.adobe.com/artifactory/generic-acpl-release-local/cicdanalytics/${file_date}/accountsInfo_acpl-fc.json  || cd .
+       curl -u "${ARTFY_USER}:${ARTFY_APIKEY}" -O https://artifactory.corp.adobe.com/artifactory/generic-acpl-release-local/cicdanalytics/${file_date}/accountsInfo_acpl-resiliency.json  || cd .
+       curl -u "${ARTFY_USER}:${ARTFY_APIKEY}" -O https://artifactory.corp.adobe.com/artifactory/generic-acpl-release-local/cicdanalytics/${file_date}/accountsInfo_acpl-release.json  || cd .
+       curl -u "${ARTFY_USER}:${ARTFY_APIKEY}" -O https://artifactory.corp.adobe.com/artifactory/generic-acpl-release-local/cicdanalytics/${file_date}/accountsInfo_acpl-win-release.json  || cd .
+    """
+
+}
+
+def uncompressJson() {
+    bat """
+    if exist jobMetrics.zip  powershell expand-archive -Force -path %WORKSPACE%/jobMetrics.zip  -destinationpath %WORKSPACE%
+    if exist prMetrics.zip  powershell expand-archive -Force -path %WORKSPACE%/prMetrics.zip  -destinationpath %WORKSPACE%
+    if exist machineMetrics.zip  powershell expand-archive -Force -path %WORKSPACE%/machineMetrics.zip  -destinationpath %WORKSPACE%
+    cd %SLAVE_HOME%\\Documents\\cicdAnalytics
+    del *.json
+    cd %SLAVE_HOME%\\Documents
+    xcopy "%WORKSPACE%\\jobMetrics\\*.json" cicdAnalytics /y  || cd .
+    cd %SLAVE_HOME%\\Documents
+    xcopy "%WORKSPACE%\\prMetrics\\*.json" cicdAnalytics /y  || cd .
+    cd %SLAVE_HOME%\\Documents
+    xcopy "%WORKSPACE%\\machineMetrics\\*.json" cicdAnalytics /y  || cd .
+    cd %WORKSPACE%
+    ren *.json* ????????????????????????????????????????????????????????"%date:~4,2%%date:~7,2%%date:~10,4%%time:~0,2%%time:~3,2%%time:~6,2%".*  || cd .
+    cd %SLAVE_HOME%\\Documents
+    xcopy "%WORKSPACE%\\*.json" cicdAnalytics /y  || cd .
+    
+    """
+}
+
+pipeline {
+  agent {
+    label {
+      label params.BUILD_LABEL
+    }
+  }
+
+parameters {
+    string(name: 'BUILD_LABEL', defaultValue: 'forwarder', description: 'Label associated with the Jenkins node(s) to run this job')
+  }
+
+stages{
+    stage('Downloading json') {
+      steps {
+           downloadJson()
+           uncompressJson()
+        }
+      }
+  }   
+}
